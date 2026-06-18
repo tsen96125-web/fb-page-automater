@@ -119,12 +119,12 @@ enhanced_prompt = f"{user_img_prompt}, photorealistic, highly detailed, professi
 image_url = f"https://image.pollinations.ai/prompt/{enhanced_prompt.replace(' ', '%20')}?width=1080&height=1080&nologo=true&enhance=true"
 # 3. Facebook Graph API එකට Post කිරීම
 fb_url = f"https://graph.facebook.com/{user_data['page_id']}/photos"
-        payload ={
-            'caption': full_post,
-            'url': image_url,
-            'access_token': user_data['access_key']
-        }
-        fb_res = requests.post(fb_url, data=payload)
+payload = {
+      'caption': full_post,
+      'url': image_url,
+      'access_token': user_data['access_key']
+}
+fb_res = requests.post(fb_url, data=payload)
             
             if fb_res.status_code == 200:
                 st.success("පෝස්ට් එක සාර්ථකව Facebook පිටුවට එකතු කරන ලදී!")
