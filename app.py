@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import urllib.parse
 from supabase import create_client, Client
 
 # Page Configuration (ඇප් එකේ මූලික සැකසුම්)
@@ -57,9 +58,8 @@ with col_save:
                 "image_details": image_details
             }
             try:
-                # Supabase වෙත දත්ත යැවීම (Upsert මඟින් අලුත් කරයි හෝ අලුතින් සාදයි)
                 supabase.table("user_config").upsert(data).execute()
-                st.success("✅ ඔබගේ සියලුම සැකසුම් (Settings) සාර්ථකව සුරැකුණා! දැන් නියමිත වෙලාවට පසුබිමෙන් පෝස්ට් හැදේවි.")
+                st.success("✅ ඔබගේ සියලුම සැකසුම් (Settings) සාර්ථකව සුරැකුණා!")
             except Exception as e:
                 st.error(f"❌ Database එකට දත්ත දැමීමේදී දෝෂයක් ඇති විය: {str(e)}")
 
@@ -70,27 +70,20 @@ with col_post:
         else:
             with st.spinner("⏳ AI මඟින් උසස් තත්ත්වයේ පෝස්ට් එක සහ රූපය සකසමින් පවතී..."):
                 try:
-                    # 1. පිළිවෙලකට සහ ව්‍යුහයකට අනුව Text එක සෑදීමට දෙන විධානය
-                    prompt_text = f"""
-                    You are an expert social media marketer. Write a highly attractive, engaging, and professional Facebook marketing post based on these details: '{content_details}'
-                    The entire post MUST be strictly written in {language}.
-
-                    Strict Structure Rules to follow:
-                    1. START with an eye-catching hook line (use relevant emojis).
-                    2. BODY: Divide the content into 2-3 short, clean paragraphs or bullet points explaining the main benefits. Do NOT make it a long wall of text. Use engaging emojis naturally.
-                    3. LANGUAGE: Ensure the tone is natural, professional, and grammatically perfect for a Facebook audience. Avoid literal or robotic translations.
-                    4. CALL TO ACTION: End with a clear call to action.
-                    5. HASHTAGS: At the very end of the post, automatically add exactly 15 highly viral and relevant hashtags based on the content.
-                    """
+                    # ආරක්ෂිතව තනි පේළියට Prompt එක සකස් කිරීම
+                    raw_prompt = f"Act as an expert social media marketer. Write an attractive, highly engaging and professional Facebook marketing post about: '{content_details}'. The entire post MUST be strictly written in perfect {language}. Structure: 1) Start with an eye-catching hook line using relevant emojis. 2) Body: 2-3 short, clean paragraphs or bullet points explaining main benefits, no long wall of text, use emojis naturally. 3) Tone: natural, perfect grammar for Facebook. 4) Clear call to action at the end. 5) Finish by adding exactly 15 highly viral and relevant hashtags based on the content."
                     
-                    text_res = requests.get(f"https://text.pollinations.ai/{prompt_text}").text
+                    # URL එකක් තුලට දැමීමට හැකි වන පරිදි අකුරු හැඩගැස්වීම (URL Encoding)
+                    encoded_text_prompt = urllib.parse.quote(raw_prompt)
+                    text_res = requests.get(f"https://text.pollinations.ai/{encoded_text_prompt}").text
                     full_post = f"{text_res}\n\n#Automated #Marketing"
 
-                    # 2. Quality එක සහ Realism එක වැඩි කර රූපය සෑදීමට දෙන විධානය
-                    enhanced_prompt = f"{image_details}, photorealistic, highly detailed, professional commercial photography, 8k resolution, sharp focus, studio lighting, award-winning composition, cinematic look, no cartoon, no anime, no render"
-                    image_url = f"https://image.pollinations.ai/prompt/{enhanced_prompt.replace(' ', '%20')}?width=1080&height=1080&nologo=true&enhance=true"
+                    # Quality එක සහ Realism එක වැඩි කර රූපය සෑදීම
+                    enhanced_image_prompt = f"{image_details}, photorealistic, highly detailed, professional commercial photography, 8k resolution, sharp focus, studio lighting, award-winning composition, cinematic look, no cartoon, no anime, no render"
+                    encoded_image_prompt = urllib.parse.quote(enhanced_image_prompt)
+                    image_url = f"https://image.pollinations.ai/prompt/{encoded_image_prompt}?width=1080&height=1080&nologo=true&enhance=true"
 
-                    # 3. Facebook Graph API එක හරහා පිටුවට Upload කිරීම
+                    # Facebook Graph API එක හරහා පිටුවට Upload කිරීම
                     fb_url = f"https://graph.facebook.com/{page_id}/photos"
                     payload = {
                         'caption': full_post,
@@ -108,78 +101,3 @@ with col_post:
 
                 except Exception as e:
                     st.error(f"❌ ක්‍රියාවලිය අතරතුර බලාපොරොත්තු නොවූ දෝෂයක් ඇති විය: {str(e)}")
-1. START with an eye-catching hook line (use relevant emojis).
-2. BODY: Divide the content into 2-3 short, clean paragraphs or bullet points explaining the main benefits. Do NOT make it a long wall of text. Use engaging emojis naturally.
-3. LANGUAGE: Ensure the tone is natural, professional, and grammatically perfect for a Facebook audience. Avoid literal or robotic translations.
-4. CALL TO ACTION: End with a clear call to action (e.g., "Inbox us now or comment below").
-5. HASHTAGS: At the very end of the post, automatically add exactly 15 highly viral and relevant hashtags based on the content.
-"""
-            
-            # පරිශීලකයා දෙන විස්තරයට අමතරව Quality එක වැඩි කරන Keywords ස්වයංක්‍රීයව එකතු කිරීම
-user_img_prompt = user.get('image_details', 'Professional business setup')
-enhanced_prompt = f"{user_img_prompt}, photorealistic, highly detailed, professional commercial photography, 8k resolution, sharp focus, studio lighting, award-winning composition, cinematic look, no cartoon, no anime, no render"
-
-# Pollinations AI වෙත නව විමසුම යැවීම
-image_url = f"https://image.pollinations.ai/prompt/{enhanced_prompt.replace(' ', '%20')}?width=1080&height=1080&nologo=true&enhance=true"
-# 3. Facebook Graph API එකට Post කිරීම
-fb_url = f"https://graph.facebook.com/{user_data['page_id']}/photos"
-payload = {
-      'caption': full_post,
-      'url': image_url,
-      'access_token': user_data['access_key']
-}
-fb_res = requests.post(fb_url, data=payload)
-            
-            if fb_res.status_code == 200:
-                st.success("පෝස්ට් එක සාර්ථකව Facebook පිටුවට එකතු කරන ලදී!")
-            else:
-                st.error("Facebook සමග සම්බන්ධ වීමට නොහැකි විය. Access Key එක පරීක්ෂා කරන්න.")
-
-# 4. Schedule Page පිටුව
-elif st.session_state.page == "schedule":
-    st.title("🗓️ Schedule Posts")
-    
-    if st.button("Delete previous schedule"):
-        st.warning("පැරණි Schedule එක මකා දමන ලදී.")
-        
-    repeat = st.selectbox("Repeat", ["Daily", "Weekly", "Monthly"])
-    
-    # Digital Clock / Time Picker (උපරිම වෙලාවන් 3ක්)
-    st.write("Add Time (Max 3)")
-    time_input = st.time_input("Select Time")
-    if "times" not in st.session_state:
-        st.session_state.times = []
-        
-    if st.button("Add"):
-        if len(st.session_state.times) < 3:
-            st.session_state.times.append(str(time_input))
-            st.success(f"Time {time_input} added!")
-        else:
-            st.error("උපරිම වෙලාවන් 3ක් පමණි ඇතුලත් කල හැක්කේ.")
-            
-    st.write(f"Selected Times: {st.session_state.times}")
-    
-    st.write("### Post Content Generation")
-    languages = ["English", "Sinhala", "Tamil", "Hindi", "Spanish", "French"] # භාෂා 80ක් දක්වා මෙතනට එක් කල හැක
-    selected_lang = st.selectbox("Select Language", languages)
-    post_details = st.text_area("Add Post Content Details")
-    
-    st.write("### Image Generation")
-    image_details = st.text_area("Image Details")
-    
-    if st.button("Save Details"):
-        user_id = st.session_state.user.id
-        supabase.table("user_config").update({
-            "schedule_type": repeat,
-            "schedule_times": ",".join(st.session_state.times),
-            "language": selected_lang,
-            "content_details": post_details,
-            "image_details": image_details
-        }).eq("id", user_id).execute()
-        st.success("Details saved permanently!")
-        
-    if st.button("Start the workflow"):
-        st.success("Workflow එක සාර්ථකව සක්‍රීය කරන ලදී! දැන් ඇප් එක වසා දැමුවද ක්‍රියාවලිය සිදුවේ.")
-        if st.button("Back to Dashboard"):
-            st.session_state.page = "dashboard"
-            st.rerun()
