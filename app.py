@@ -1,109 +1,113 @@
 import streamlit as st
 import requests
-import pandas as pd
-import matplotlib.pyplot as plt
 from supabase import create_client, Client
 
-# Supabase සම්බන්ධතාවය (ඔබගේ Keys පසුව ඇතුලත් කරන්න)
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Page Configuration (ඇප් එකේ මූලික සැකසුම්)
+st.set_page_config(page_title="Facebook Page Automator", page_icon="🚀", layout="centered")
 
-st.set_page_config(page_title="FB Page Automater", layout="centered")
+st.title("📱 Facebook Page Automation Panel")
+st.write("ඔබගේ Facebook පිටුව ස්වයංක්‍රීයව පවත්වාගෙන යන පද්ධතිය මෙතැනින් පාලනය කරන්න.")
 
-# Session State පාලනය
-if "user" not in st.session_state:
-    st.session_state.user = None
-if "page" not in st.session_state:
-    st.session_state.page = "login"
+# Supabase සම්බන්ධතාවය පරීක්ෂා කිරීම
+try:
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    st.error("⚠️ Streamlit Secrets වල Supabase විස්තර ඇතුලත් කර නැත! කරුණාකර Settings පරීක්ෂා කරන්න.")
+    st.stop()
 
-# --- පිටු පාලනය (Page Navigation) ---
+st.markdown("---")
+st.subheader("⚙️ Configuration Settings (සැකසුම්)")
 
-# 1. Login & Registration පිටුව
-if st.session_state.page == "login":
-    st.title("🔐 FB Page Automater - Login")
-    tab1, tab2 = st.tabs(["Sign In", "Sign Up"])
-    
-    with tab1:
-        email = st.text_input("Email", key="login_email")
-        password = st.text_input("Password", type="password", key="login_pass")
-        if st.button("Log In"):
-            try:
-                res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                st.session_state.user = res.user
-                # කලින් දත්ත ඇත්දැයි බැලීම
-                config = supabase.table("user_config").select("*").eq("id", res.user.id).execute()
-                if config.data:
-                    st.session_state.page = "dashboard"
-                else:
-                    st.session_state.page = "connect_fb"
-                st.rerun()
-            except Exception as e:
-                st.error(f"Login වැරදියි: {str(e)}")
-                
-    with tab2:
-        new_email = st.text_input("New Email", key="reg_email")
-        new_password = st.text_input("New Password", type="password", key="reg_pass")
-        if st.button("Register & Send Verification"):
-            try:
-                supabase.auth.sign_up({"email": new_email, "password": new_password})
-                st.success("Verification Email එකක් ඔබගේ ලිපිනයට යවන ලදි. කරුණාකර එය Verify කර Log වන්න.")
-            except Exception as e:
-                st.error(f"ලියාපදිංචිය අසාර්ථකයි: {str(e)}")
+# පරිශීලකයාගෙන් දත්ත ලබාගන්නා කොටස් (Form Inputs)
+user_id = st.text_input("User ID (ඔබව හඳුනාගැනීමට කැමති කෙටි නමක් ලබාදෙන්න)", placeholder="Ex: thivanka_01")
+page_id = st.text_input("Facebook Page ID", placeholder="Ex: 102938475654321")
+access_key = st.text_input("Facebook Page Access Token / Key", type="password", placeholder="EAAZ...")
 
-# 2. Connect Facebook Page පිටුව
-elif st.session_state.page == "connect_fb":
-    st.title("🔗 Connect your Facebook Page")
-    page_id = st.text_input("Enter your Facebook Page ID")
-    access_key = st.text_input("Enter the Page Access Key", type="password")
-    
-    if st.button("Save Information"):
-        if page_id and access_key:
-            try:
-                supabase.table("user_config").insert({
-                    "id": st.session_state.user.id,
-                    "page_id": page_id,
-                    "access_key": access_key
-                }).execute()
-                st.success("Information saved successfully!")
-                st.session_state.page = "dashboard"
-                st.rerun()
-            except Exception as e:
-                st.error(f"සුරැකීමට නොහැකි විය: {str(e)}")
+col1, col2 = st.columns(2)
+with col1:
+    schedule_type = st.selectbox("Schedule Type (ක්‍රියාත්මක වන වටය)", ["Daily", "Weekly", "Monthly"])
+with col2:
+    language = st.selectbox("Language (භාෂාව)", ["Sinhala", "English"])
+
+schedule_times = st.text_input("Schedule Times (පෝස්ට් විය යුතු වෙලාවන් - කොමා වලින් වෙන් කරන්න)", value="08:00,14:00,20:00", help="පැය 24 ක්‍රමයට ලියන්න. උදා: 08:00,14:30")
+
+content_details = st.text_area("Post Content Details (AI එකෙන් ලියන්න ඕනේ දේ ගැන විස්තරයක්)", placeholder="Ex: Suwastha Mobile Spa service offering relaxing full body massage therapies in Kegalle area by professional male therapist.")
+image_details = st.text_area("Image Details / Prompt (AI එකෙන් හැදෙන්න ඕනේ රූපය ගැන විස්තරයක්)", placeholder="Ex: High quality realistic photo of a luxury spa room with candles, massage table, warm lighting, peaceful environment")
+
+st.markdown("---")
+
+# බොත්තම් ක්‍රියාත්මක වන කොටස (Action Buttons)
+col_save, col_post = st.columns(2)
+
+with col_save:
+    if st.button("💾 Save Settings to Database", use_container_width=True):
+        if not user_id or not page_id or not access_key:
+            st.warning("⚠️ කරුණාකර User ID, Page ID සහ Access Key අනිවාර්යයෙන්ම පුරවන්න!")
         else:
-            st.warning("කරුණාකර සියලු විස්තර ඇතුලත් කරන්න.")
+            data = {
+                "id": user_id,
+                "page_id": page_id,
+                "access_key": access_key,
+                "schedule_type": schedule_type,
+                "schedule_times": schedule_times,
+                "language": language,
+                "content_details": content_details,
+                "image_details": image_details
+            }
+            try:
+                # Supabase වෙත දත්ත යැවීම (Upsert මඟින් අලුත් කරයි හෝ අලුතින් සාදයි)
+                supabase.table("user_config").upsert(data).execute()
+                st.success("✅ ඔබගේ සියලුම සැකසුම් (Settings) සාර්ථකව සුරැකුණා! දැන් නියමිත වෙලාවට පසුබිමෙන් පෝස්ට් හැදේවි.")
+            except Exception as e:
+                st.error(f"❌ Database එකට දත්ත දැමීමේදී දෝෂයක් ඇති විය: {str(e)}")
 
-# 3. Dashboard පිටුව
-elif st.session_state.page == "dashboard":
-    st.title("📊 FB Page Automater")
-    
-    # Facebook විස්තර පෙන්වීම (Mocking Data for UI and real connectivity setup)
-    user_id = st.session_state.user.id
-    user_data = supabase.table("user_config").select("*").eq("id", user_id).execute().data[0]
-    
-    st.subheader(f"Connected Page ID: {user_data['page_id']}")
-    
-    # Analytics ප්‍රස්ථාර (Graphs)
-    st.write("### Page Performance")
-    chart_data = pd.DataFrame({"Days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], "Followers Growth": [10, 23, 35, 45, 60, 82, 100]})
-    st.line_chart(chart_data.set_index("Days"))
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🗓️ Schedule Posts", use_container_width=True):
-            st.session_state.page = "schedule"
-            st.rerun()
-    with col2:
-        if st.button("🚀 Upload a Post Now", use_container_width=True):
-            st.info("AI මගින් Post එක සහ ඡායාරූපය නිපදවමින් පවතී...")
-            
-            # 1. AI Text Generation (Pollinations AI Free endpoint)
-            # වඩාත් ගුණාත්මක සහ පිළිවෙලකට පෝස්ට් එක හැදීමට දෙන නව උපදේශය (Advanced Prompt)
-prompt_text = f"""
-You are an expert social media marketer. Write a highly attractive, engaging, and professional Facebook marketing post based on these details: '{user.get('content_details')}'
-The entire post MUST be strictly written in {user.get('language')}.
+with col_post:
+    if st.button("🚀 Upload a Post Now (ක්ෂණිකව පෝස්ට් කරන්න)", use_container_width=True):
+        if not page_id or not access_key:
+            st.warning("⚠️ ක්ෂණිකව පෝස්ට් කිරීමට Page ID සහ Access Key ඇතුලත් කර තිබිය යුතුය!")
+        else:
+            with st.spinner("⏳ AI මඟින් උසස් තත්ත්වයේ පෝස්ට් එක සහ රූපය සකසමින් පවතී..."):
+                try:
+                    # 1. පිළිවෙලකට සහ ව්‍යුහයකට අනුව Text එක සෑදීමට දෙන විධානය
+                    prompt_text = f"""
+                    You are an expert social media marketer. Write a highly attractive, engaging, and professional Facebook marketing post based on these details: '{content_details}'
+                    The entire post MUST be strictly written in {language}.
 
-Strict Structure Rules to follow:
+                    Strict Structure Rules to follow:
+                    1. START with an eye-catching hook line (use relevant emojis).
+                    2. BODY: Divide the content into 2-3 short, clean paragraphs or bullet points explaining the main benefits. Do NOT make it a long wall of text. Use engaging emojis naturally.
+                    3. LANGUAGE: Ensure the tone is natural, professional, and grammatically perfect for a Facebook audience. Avoid literal or robotic translations.
+                    4. CALL TO ACTION: End with a clear call to action.
+                    5. HASHTAGS: At the very end of the post, automatically add exactly 15 highly viral and relevant hashtags based on the content.
+                    """
+                    
+                    text_res = requests.get(f"https://text.pollinations.ai/{prompt_text}").text
+                    full_post = f"{text_res}\n\n#Automated #Marketing"
+
+                    # 2. Quality එක සහ Realism එක වැඩි කර රූපය සෑදීමට දෙන විධානය
+                    enhanced_prompt = f"{image_details}, photorealistic, highly detailed, professional commercial photography, 8k resolution, sharp focus, studio lighting, award-winning composition, cinematic look, no cartoon, no anime, no render"
+                    image_url = f"https://image.pollinations.ai/prompt/{enhanced_prompt.replace(' ', '%20')}?width=1080&height=1080&nologo=true&enhance=true"
+
+                    # 3. Facebook Graph API එක හරහා පිටුවට Upload කිරීම
+                    fb_url = f"https://graph.facebook.com/{page_id}/photos"
+                    payload = {
+                        'caption': full_post,
+                        'url': image_url,
+                        'access_token': access_key
+                    }
+                    fb_res = requests.post(fb_url, data=payload)
+
+                    if fb_res.status_code == 200:
+                        st.success("🎉 සාර්ථකයි! පෝස්ට් එක ඔබගේ Facebook පිටුවට ක්ෂණිකව Upload විය.")
+                        st.image(image_url, caption="Generated AI Image (High Quality)", use_column_width=True)
+                        st.info(f"**Generated Text:**\n\n{full_post}")
+                    else:
+                        st.error(f"❌ Facebook දෝෂයකි: {fb_res.text}")
+
+                except Exception as e:
+                    st.error(f"❌ ක්‍රියාවලිය අතරතුර බලාපොරොත්තු නොවූ දෝෂයක් ඇති විය: {str(e)}")
 1. START with an eye-catching hook line (use relevant emojis).
 2. BODY: Divide the content into 2-3 short, clean paragraphs or bullet points explaining the main benefits. Do NOT make it a long wall of text. Use engaging emojis naturally.
 3. LANGUAGE: Ensure the tone is natural, professional, and grammatically perfect for a Facebook audience. Avoid literal or robotic translations.
