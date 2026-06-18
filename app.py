@@ -98,14 +98,26 @@ elif st.session_state.page == "dashboard":
             st.info("AI මගින් Post එක සහ ඡායාරූපය නිපදවමින් පවතී...")
             
             # 1. AI Text Generation (Pollinations AI Free endpoint)
-            prompt_text = f"Create a professional, unique marketing post about: {user_data.get('content_details', 'Business')}. Language: {user_data.get('language', 'English')}"
-            text_response = requests.get(f"https://text.pollinations.ai/{prompt_text}").text
-            full_post = f"{text_response}\n\n#Marketing #Automated"
+            # වඩාත් ගුණාත්මක සහ පිළිවෙලකට පෝස්ට් එක හැදීමට දෙන නව උපදේශය (Advanced Prompt)
+prompt_text = f"""
+You are an expert social media marketer. Write a highly attractive, engaging, and professional Facebook marketing post based on these details: '{user.get('content_details')}'
+The entire post MUST be strictly written in {user.get('language')}.
+
+Strict Structure Rules to follow:
+1. START with an eye-catching hook line (use relevant emojis).
+2. BODY: Divide the content into 2-3 short, clean paragraphs or bullet points explaining the main benefits. Do NOT make it a long wall of text. Use engaging emojis naturally.
+3. LANGUAGE: Ensure the tone is natural, professional, and grammatically perfect for a Facebook audience. Avoid literal or robotic translations.
+4. CALL TO ACTION: End with a clear call to action (e.g., "Inbox us now or comment below").
+5. HASHTAGS: At the very end of the post, automatically add exactly 15 highly viral and relevant hashtags based on the content.
+"""
             
-            # 2. AI Image Generation (Pollinations Image endpoint)
-            img_prompt = user_data.get('image_details', 'Professional business setup')
-            image_url = f"https://image.pollinations.ai/prompt/{img_prompt.replace(' ', '%20')}?width=1080&height=1080&nologo=true"
-            
+            # පරිශීලකයා දෙන විස්තරයට අමතරව Quality එක වැඩි කරන Keywords ස්වයංක්‍රීයව එකතු කිරීම
+user_img_prompt = user.get('image_details', 'Professional business setup')
+enhanced_prompt = f"{user_img_prompt}, photorealistic, highly detailed, professional commercial photography, 8k resolution, sharp focus, studio lighting, award-winning composition, cinematic look, no cartoon, no anime, no render"
+
+# Pollinations AI වෙත නව විමසුම යැවීම
+image_url = f"https://image.pollinations.ai/prompt/{enhanced_prompt.replace(' ', '%20')}?width=1080&height=1080&nologo=true&enhance=true"
+
             # 3. Facebook Graph API එකට Post කිරීම
             fb_url = f"https://graph.facebook.com/{user_data['page_id']}/photos"
             payload = {
