@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 from supabase import create_client, Client
 
 # Supabase සම්බන්ධතාවය (ඔබගේ Keys පසුව ඇතුලත් කරන්න)
-SUPABASE_URL = st.secrets["https://otjrumeewtcokfscyvgd.supabase.co"]
-SUPABASE_KEY = st.secrets["sb_publishable_5lukLFLWWhA-0fKrqiVpmw_s-LWzj_p"]
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.set_page_config(page_title="FB Page Automater", layout="centered")
